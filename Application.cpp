@@ -8,11 +8,11 @@
 #include <map>
 #include <string.h>
 #include <vector>
+#include <math.h>
 
 #define FILE_DELIMITER "!!@@BOOYAH@@!!"
 
-#define FS_ORANGE_TRIANGLE 0
-#define FS_YELLOW_TRIANGLE 1
+#define FS_COLOR_FROM_VECTOR 0
 
 #define VS_DRAW_VEC3_ARRAY 0
 
@@ -72,13 +72,21 @@ static int dumpFilesIntoStrings(long type, std::vector<std::pair<long, std::stri
     {
         if (in.size() < 1)
         {
+            aFile.open("C:\\Users\\Jacob\\source\\repos\\tetrs3\\aFile.txt", std::ios::out | std::ios::app);
+            snprintf(cBuffer, sizeof(cBuffer), "too few vertex shaders\n");
+            aFile.write(cBuffer, strlen(cBuffer));
+            aFile.close();
             return 0;
         }
     }
     else if (type == GL_FRAGMENT_SHADER)
     {
-        if (in.size() < 2)
+        if (in.size() < 1)
         {
+            aFile.open("C:\\Users\\Jacob\\source\\repos\\tetrs3\\aFile.txt", std::ios::out | std::ios::app);
+            snprintf(cBuffer, sizeof(cBuffer), "too few fragment shaders\n");
+            aFile.write(cBuffer, strlen(cBuffer));
+            aFile.close();
             return 0;
         }
     }
@@ -203,47 +211,43 @@ void Application::mainLoop()
     GLuint VBO[2];
     unsigned int EBO[2];
     std::vector<unsigned int> shaderList;
-    unsigned int triangleProgram[2];
+    unsigned int triangleProgram;
     char* inBuffer;
     std::vector<std::pair<long, std::string>> fragmentShaderStrings;
     std::vector<std::pair<long, std::string>> vertexShaderStrings;
     std::vector<std::pair<long, std::string>> outShaders;
     char buffer[1028];
     std::ofstream aFile;
+    float timeValue;
+    int vertexColorLocation;
 
     if(!dumpFilesIntoStrings(GL_VERTEX_SHADER, vertexShaderStrings))return;
     if(!dumpFilesIntoStrings(GL_FRAGMENT_SHADER, fragmentShaderStrings))return;
 
     outShaders.push_back(vertexShaderStrings[VS_DRAW_VEC3_ARRAY]);
-    outShaders.push_back(fragmentShaderStrings[FS_YELLOW_TRIANGLE]);
+    outShaders.push_back(fragmentShaderStrings[FS_COLOR_FROM_VECTOR]);
 
     if (!prepareShaders(shaderList, outShaders))return;
-    if(!createProgram(triangleProgram[0], shaderList))return;
-
-    std::vector<std::pair<long, std::string>>().swap(outShaders);
-    std::vector<unsigned int>().swap(shaderList);
-
-    outShaders.push_back(vertexShaderStrings[VS_DRAW_VEC3_ARRAY]);
-    outShaders.push_back(fragmentShaderStrings[FS_ORANGE_TRIANGLE]);
-
-    if (!prepareShaders(shaderList, outShaders))return;
-    if (!createProgram(triangleProgram[1], shaderList))return;
+    if(!createProgram(triangleProgram, shaderList))return;
 
     save3DVertexArray(VAO[0], VBO[0], EBO[0], vertices, sizeof(vertices), indices1, sizeof(indices1));
     save3DVertexArray(VAO[1], VBO[1], EBO[1], vertices, sizeof(vertices), indices2, sizeof(indices2));
+    vertexColorLocation = glGetUniformLocation(triangleProgram, "appColor");
 
     while (!glfwWindowShouldClose(window))
     {
         processInput(window);
+        timeValue = glfwGetTime();
 
         glClearColor(.2f, .3f, .3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        glUseProgram(triangleProgram[0]);
+        glUseProgram(triangleProgram);
+        glUniform4f(vertexColorLocation, 0.0f, (sin(timeValue) / 2.0) + .5, 0.0f, 1.0f);
+
         glBindVertexArray(VAO[0]);
         glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, 0);
 
-        glUseProgram(triangleProgram[1]);
         glBindVertexArray(VAO[1]);
         glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, 0);
 
@@ -252,8 +256,8 @@ void Application::mainLoop()
     }
     glDeleteVertexArrays(2, VAO);
     glDeleteBuffers(2, VBO);
-    glDeleteProgram(triangleProgram[0]);
-    glDeleteProgram(triangleProgram[1]);
+    glDeleteProgram(triangleProgram);
+    glDeleteProgram(triangleProgram);
 }
 
 int Application::showWindow()
