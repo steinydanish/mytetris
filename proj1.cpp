@@ -1,15 +1,14 @@
 #include "proj1.h"
+#include "Application.h"
 
 #include <iostream>
 
-extern void printHelloWorld()
-{
-	std::cout << "Hello World" << std::endl;
-}
-
 int main()
 {
-	printHelloWorld();
+    Application mainApp;
+	mainApp.showWindow();
+	mainApp.mainLoop();
+	mainApp.cleanup();
 
 	return 0;
 }
