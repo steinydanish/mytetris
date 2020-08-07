@@ -1,4 +1,9 @@
 #include "Application.h"
+#include "Program.h"
+#include "FILE_OPERATOR.h"
+#include "ShaderBank.h"
+#include "VertexArray.h"
+#include "BufferObject.h"
 
 #include <iostream>
 #include <fstream>
@@ -10,254 +15,115 @@
 #include <vector>
 #include <math.h>
 
-#define FILE_DELIMITER "!!@@BOOYAH@@!!"
 
 #define FS_COLOR_FROM_VECTOR 0
 
 #define VS_DRAW_VEC3_ARRAY 0
+
+void logError(int n)
+{
+    if (n == BUFFER_OBJECT_INVALID_TYPE)
+    {
+        FILE_OPERATOR::printStringToErrorLog("invalid buffer type\n");
+    }
+    else if (n == MEMORY_ALLOCATION_EXCEPTION)
+    {
+        FILE_OPERATOR::printStringToErrorLog("malloc failed\n");
+    }
+    else if (n == SIZE_MISMATCH_EXCEPTION)
+    {
+        FILE_OPERATOR::printStringToErrorLog("vector sizes were off\n");
+    }
+    else if (n == USED_UNLINKED_PROGRAM)
+    {
+        FILE_OPERATOR::printStringToErrorLog("tried to use unlinked program\n");
+    }
+    else if (n == COULD_NOT_LOAD_IMAGE_DATA)
+    {
+        FILE_OPERATOR::printStringToErrorLog("failed to load image data\n");
+    }
+    else if (n == BAD_SHADERGROUP_ID)
+    {
+        FILE_OPERATOR::printStringToErrorLog("bad shader group id\n");
+    }
+    else if (n == SHADER_INIT_FAILED)
+    {
+        FILE_OPERATOR::printStringToErrorLog("failed to initialize shaders\n");
+    }
+}
 
 static void viewPortResize(GLFWwindow* win, int width, int height)
 {
     glViewport(0, 0, width, height);
 }
 
-/*
- * Allocates adequate memory for inBuffer and dumps file at fileName into it.
- * Callers responsibility to free inBuffer
- */
-static int dumpFilesIntoStrings(long type, std::vector<std::pair<long, std::string>>& in)
-{
-    std::ifstream shaderFile;
-    std::stringstream inStream;
-    std::string buffer;
-    char cBuffer[1028];
-    std::ofstream aFile;
-
-
-    if (type == GL_VERTEX_SHADER)
-    {
-        shaderFile.open("TriangleVS.glsl");
-    }
-    else if (type == GL_FRAGMENT_SHADER)
-    {
-        shaderFile.open("TriangleFS.glsl");
-    }
-
-    if (shaderFile.is_open())
-    {
-        while (getline(shaderFile, buffer))
-        {
-            if (buffer.compare(FILE_DELIMITER) == 0)
-            {
-                in.push_back({type, inStream.str()});
-                inStream.str(std::string());
-            }
-            else
-            {
-                inStream << buffer << "\r\n";
-            }
-        }
-    }
-    else
-    {
-        aFile.open("C:\\Users\\Jacob\\source\\repos\\tetrs3\\aFile.txt", std::ios::out | std::ios::app);
-        snprintf(cBuffer, sizeof(cBuffer), "%X didn't open\n", type);
-        aFile.write(cBuffer, strlen(cBuffer));
-        aFile.close();
-        return 0;
-    }
-    in.push_back({type, inStream.str()});
-
-    if (type == GL_VERTEX_SHADER)
-    {
-        if (in.size() < 1)
-        {
-            aFile.open("C:\\Users\\Jacob\\source\\repos\\tetrs3\\aFile.txt", std::ios::out | std::ios::app);
-            snprintf(cBuffer, sizeof(cBuffer), "too few vertex shaders\n");
-            aFile.write(cBuffer, strlen(cBuffer));
-            aFile.close();
-            return 0;
-        }
-    }
-    else if (type == GL_FRAGMENT_SHADER)
-    {
-        if (in.size() < 1)
-        {
-            aFile.open("C:\\Users\\Jacob\\source\\repos\\tetrs3\\aFile.txt", std::ios::out | std::ios::app);
-            snprintf(cBuffer, sizeof(cBuffer), "too few fragment shaders\n");
-            aFile.write(cBuffer, strlen(cBuffer));
-            aFile.close();
-            return 0;
-        }
-    }
-    return 1;
-}
-
-static int prepareShaders(std::vector<unsigned int>& shaderIds, const std::vector<std::pair<long, std::string>> source) 
-{
-    int success;
-    char infoLog[512];
-    char buffer[1028];
-    char* bPtr = buffer;
-    std::ofstream aFile;
-    std::vector<std::pair<long, std::string>>::const_iterator vectIter;
-    unsigned int shaderId;
-    static const std::map<long, std::string> typeMap = { {GL_VERTEX_SHADER, "VERTEX"},{GL_FRAGMENT_SHADER, "FRAGMENT"} };
-
-    for(vectIter = source.begin(); vectIter != source.end(); vectIter++)
-    {
-        shaderId = glCreateShader(vectIter->first);
-
-        snprintf(buffer, sizeof(buffer), "%s", vectIter->second.c_str());
-
-        glShaderSource(shaderId, 1, (const GLchar** const)(&bPtr), NULL);
-
-        glCompileShader(shaderId);
-        glGetShaderiv(shaderId, GL_COMPILE_STATUS, &success);
-        if (!success)
-        {
-            glGetShaderInfoLog(shaderId, 512, NULL, infoLog);
-            aFile.open("C:\\Users\\Jacob\\source\\repos\\tetrs3\\aFile.txt", std::ios::out | std::ios::app);
-            snprintf(buffer, sizeof(buffer), "%s failed to compile:\n%s\n", typeMap.at(vectIter->first).c_str(), infoLog);
-            aFile.write(buffer, strlen(buffer));
-            aFile.close();
-            return 0;
-        }
-        shaderIds.push_back(shaderId);
-    }
-
-    return 1;
-}
-
-static int createProgram(unsigned int& programId, const std::vector<unsigned int> shaders)
-{
-    int success;
-    char infoLog[512];
-    char buffer[1028];
-    std::ofstream aFile;
-    std::vector<unsigned int>::const_iterator vectIter;
-
-    programId = glCreateProgram();
-
-    for (vectIter = shaders.begin(); vectIter != shaders.end(); vectIter++)
-    {
-        glAttachShader(programId, *vectIter);
-    }
-    glLinkProgram(programId);
-
-    for (vectIter = shaders.begin(); vectIter != shaders.end(); vectIter++)
-    {
-        glDeleteShader(*vectIter);
-    }
-
-    glGetProgramiv(programId, GL_LINK_STATUS, &success);
-    if (!success)
-    {
-        glGetProgramInfoLog(programId, 512, NULL, infoLog);
-        aFile.open("C:\\Users\\Jacob\\source\\repos\\tetrs3\\aFile.txt", std::ios::out | std::ios::app);
-        snprintf(buffer, sizeof(buffer), "failed to link:\n%s\n", infoLog);
-        aFile.write(buffer, strlen(buffer));
-        aFile.close();
-        return 0;
-    }
-
-    return 1;
-}
-
-static int save3DVertexArray
-(
-    GLuint& VAO, 
-    GLuint& VBO, 
-    GLuint& EBO, 
-    const float* vertices, 
-    const unsigned long vertSize, 
-    const unsigned int* indices, 
-    const unsigned long indicesSize
-)
-{
-    char buffer[1028];
-    std::ofstream aFile;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
-
-    glBindVertexArray(VAO);
-
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, vertSize, vertices, GL_STATIC_DRAW);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indicesSize, indices, GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-    return 1;
-}
-
 void Application::mainLoop()
 {
-    float vertices[] = {-.5f, -.5f, 0.0f,
-                        0.0f, -.5f, 0.0f,
-                         .5f, -.5f, 0.0f,
-                        0.0f,  .5f, 0.0f,
-                        }; 
-    unsigned int indices1[] = {0, 1, 3};
-    unsigned int indices2[] = {1, 2, 3};
-    GLuint VAO[2];
-    GLuint VBO[2];
-    unsigned int EBO[2];
+
+try
+{
+    VertexArray va;
     std::vector<unsigned int> shaderList;
-    unsigned int triangleProgram;
-    char* inBuffer;
-    std::vector<std::pair<long, std::string>> fragmentShaderStrings;
-    std::vector<std::pair<long, std::string>> vertexShaderStrings;
-    std::vector<std::pair<long, std::string>> outShaders;
-    char buffer[1028];
-    std::ofstream aFile;
-    float timeValue;
-    int vertexColorLocation;
+    Program program;
+    ShaderBank* sb = ShaderBank::getInstance();
+    BufferObject vboData(GL_ARRAY_BUFFER);
+    BufferObject eboData(GL_ELEMENT_ARRAY_BUFFER);
 
-    if(!dumpFilesIntoStrings(GL_VERTEX_SHADER, vertexShaderStrings))return;
-    if(!dumpFilesIntoStrings(GL_FRAGMENT_SHADER, fragmentShaderStrings))return;
+    FILE_OPERATOR::printStringToErrorLog("");
 
-    outShaders.push_back(vertexShaderStrings[VS_DRAW_VEC3_ARRAY]);
-    outShaders.push_back(fragmentShaderStrings[FS_COLOR_FROM_VECTOR]);
+    vboData.setVertexIndexPart({{ 0.5f, 0.5f, 0.0f},
+                                {0.5f, -0.5f, 0.0f},
+                                {-0.5f, -0.5f, 0.0f},
+                                {-0.5f,  0.5f, 0.0f}});
 
-    if (!prepareShaders(shaderList, outShaders))return;
-    if(!createProgram(triangleProgram, shaderList))return;
+    vboData.setColorPart({{1.0f, 0.1f, 0.2f},
+                          {0.1f, 1.0f, 0.3f}, 
+                          {0.1f, 0.2f, 1.0f},
+                          {0.7f, 1.0f, 0.1f}});
 
-    save3DVertexArray(VAO[0], VBO[0], EBO[0], vertices, sizeof(vertices), indices1, sizeof(indices1));
-    save3DVertexArray(VAO[1], VBO[1], EBO[1], vertices, sizeof(vertices), indices2, sizeof(indices2));
-    vertexColorLocation = glGetUniformLocation(triangleProgram, "appColor");
+    //vboData.setTexturePart({{1.0f, 1.0f}, 
+    //                        {1.0f, 0.0f}, 
+    //                        {0.0f, 0.0f}, 
+    //                        {0.0f, 1.0f}});
+
+    eboData.setVertexIndexPart({{0, 1, 3},
+                                {1, 2, 3}});
+
+    shaderList = sb->getShaderGroup(SHADERBANK_GROUP_ALL);
+
+    program.addShaders(shaderList);
+    program.link();
+
+    std::vector<unsigned int>().swap(shaderList);
+
+    va.setBuffer(vboData);
+    va.setBuffer(eboData);
+  //  va.setTexture("images\\wall.jpg");
+  //  program.use();
+
+   // glUniform1i(glGetUniformLocation(program.getId(), "ourTexture"), 0);
 
     while (!glfwWindowShouldClose(window))
     {
         processInput(window);
-        timeValue = glfwGetTime();
 
         glClearColor(.2f, .3f, .3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        glUseProgram(triangleProgram);
-        glUniform4f(vertexColorLocation, 0.0f, (sin(timeValue) / 2.0) + .5, 0.0f, 1.0f);
+//        va.bindTexture();
+        program.use();
 
-        glBindVertexArray(VAO[0]);
-        glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, 0);
-
-        glBindVertexArray(VAO[1]);
-        glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, 0);
+        va.bind();
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
-    glDeleteVertexArrays(2, VAO);
-    glDeleteBuffers(2, VBO);
-    glDeleteProgram(triangleProgram);
-    glDeleteProgram(triangleProgram);
+    }
+catch (int n)
+{
+    logError(n);
+}
 }
 
 int Application::showWindow()
