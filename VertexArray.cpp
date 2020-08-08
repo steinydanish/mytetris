@@ -24,6 +24,11 @@ int VertexArray::setBuffer(BufferObject& bufferData)
     BufferObject* bufferPtr;
     std::stringstream sstr;
     size_t stride;
+    size_t size = (bufferData.getType() == GL_ARRAY_BUFFER)?
+                  (bufferData.getTotalSize()):(bufferData.getIndexSize());
+    void* dataPtr = (bufferData.getType() == GL_ARRAY_BUFFER)?
+                  ((void*)bufferData.getFlattenedBufferObjectData()):
+                  ((void*)bufferData.getFlattenedIndexData());
 
     //bufferPtr = getBufferObjectFromType(bufferData.getType());
     //*bufferPtr = bufferData;
@@ -31,7 +36,7 @@ int VertexArray::setBuffer(BufferObject& bufferData)
     glBindVertexArray(vao);
 
     glBindBuffer(bufferData.getType(), bufferData.getId());
-    glBufferData(bufferData.getType(), bufferData.getTotalSize(), bufferData.getFlattenedBufferObjectData(), GL_STATIC_DRAW);
+    glBufferData(bufferData.getType(), size, dataPtr, GL_STATIC_DRAW);
 
     if(bufferData.getType() == GL_ARRAY_BUFFER)
     { 
@@ -54,7 +59,6 @@ int VertexArray::setBuffer(BufferObject& bufferData)
             glEnableVertexAttribArray(2);
         }
     }
-    
     return returnValue;
 }
 

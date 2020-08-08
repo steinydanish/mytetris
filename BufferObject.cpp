@@ -10,8 +10,11 @@ BufferObject::BufferObject()
     viSize = 0;
     colorSize = 0;
     textureSize = 0;
+    indexSize = 0;
     resetFlattenedData = false;
+    resetIndexData = false;
     flattenedData = NULL;
+    flattenedIndexData = NULL;
     type = NO_TYPE_SET;
 
     glGenBuffers(1, &id);
@@ -24,30 +27,33 @@ type{tp}
     viSize = 0;
     colorSize = 0;
     textureSize = 0;
+    indexSize = 0;
     resetFlattenedData = false;
+    resetIndexData = false;
     flattenedData = NULL;
+    flattenedIndexData = NULL;
 
     glGenBuffers(1, &id);
 }
 
-void BufferObject::setVertexIndexPart(std::initializer_list<std::initializer_list<float>> vori)
+void BufferObject::setVertexPart(std::initializer_list<std::initializer_list<float>> vori)
 {
-    vertexIndexPart.assign(vori.begin(), vori.end());
+    vertexPart.assign(vori.begin(), vori.end());
 
     totalSize -= viSize;
-    viSize = vertexIndexPart.size() * vertexIndexPart.begin()->size() * sizeof(float);
+    viSize = vertexPart.size() * vertexPart.begin()->size() * sizeof(float);
     totalSize += viSize;
     resetFlattenedData = true;
 }
 
-void BufferObject::setVertexIndexPart(std::vector<std::vector<float>>& vori)
+void BufferObject::setVertexPart(std::vector<std::vector<float>>& vori)
 {
-    std::vector<std::vector<float>>().swap(vertexIndexPart);
-    vertexIndexPart = vori;
+    std::vector<std::vector<float>>().swap(vertexPart);
+    vertexPart = vori;
     std::vector<std::vector<float>>::const_iterator vfIter;
-    size_t elZeroSize = vertexIndexPart.begin()->size();
+    size_t elZeroSize = vertexPart.begin()->size();
 
-    for (vfIter = vertexIndexPart.begin(); vfIter != vertexIndexPart.end(); vfIter++)
+    for (vfIter = vertexPart.begin(); vfIter != vertexPart.end(); vfIter++)
     {
         if (vfIter->size() != elZeroSize)
         {
@@ -56,7 +62,7 @@ void BufferObject::setVertexIndexPart(std::vector<std::vector<float>>& vori)
     }
 
     totalSize -= viSize;
-    viSize = vertexIndexPart.size() * vertexIndexPart.begin()->size() * sizeof(float);
+    viSize = vertexPart.size() * vertexPart.begin()->size() * sizeof(float);
     totalSize += viSize;
     resetFlattenedData = true;
 }
@@ -123,9 +129,35 @@ void BufferObject::setTexturePart(std::vector<std::vector<float>> texture)
     resetFlattenedData = true;
 }
 
+void BufferObject::setIndexPart(std::vector<std::vector<unsigned int>>& indices)
+{
+    std::vector<std::vector<unsigned int>>().swap(indexPart);
+    indexPart = indices;
+    std::vector<std::vector<unsigned int>>::const_iterator vfIter;
+    size_t elZeroSize = indexPart.begin()->size();
+
+    for (vfIter = indexPart.begin(); vfIter != indexPart.end(); vfIter++)
+    {
+        if (vfIter->size() != elZeroSize)
+        {
+            throw SIZE_MISMATCH_EXCEPTION;
+        }
+    }
+
+    indexSize = indexPart.size() * indexPart.begin()->size() * sizeof(unsigned int);
+    resetIndexData = true;    
+}
+void BufferObject::setIndexPart(std::initializer_list<std::initializer_list<unsigned int>> indices)
+{
+    indexPart.assign(indices.begin(), indices.end());
+
+    indexSize = indexPart.size() * indexPart.begin()->size() * sizeof(unsigned int);
+    resetIndexData = true;
+}
+
 std::vector<std::vector<float>>& BufferObject::getVertexIndexPart()
 {
-    return vertexIndexPart;
+    return vertexPart;
 }
 
 std::vector<std::vector<float>>& BufferObject::getColorPart()
@@ -137,10 +169,9 @@ std::vector<std::vector<float>>& BufferObject::getTexturePart()
 {
     return texturePart;
 }
-
-void BufferObject::setType(long type)
+std::vector<std::vector<unsigned int>>& BufferObject::getIndexPart()
 {
-    this->type = type;
+    return indexPart;
 }
 
 long BufferObject::getType()
@@ -153,12 +184,16 @@ size_t BufferObject::getTotalSize()
     return totalSize;
 }
 
+size_t BufferObject::getIndexSize()
+{
+    return indexSize;
+}
 size_t BufferObject::getStride()
 {
     size_t stride = 0;
-    if (vertexIndexPart.size() > 0)
+    if (vertexPart.size() > 0)
     {
-        stride += vertexIndexPart.begin()->size();
+        stride += vertexPart.begin()->size();
     }
     if (colorPart.size() > 0)
     {
@@ -176,7 +211,7 @@ size_t BufferObject::getColorOffset()
     {
         return 0;
     }
-    return (vertexIndexPart.size() > 0)?(vertexIndexPart.begin()->size() * sizeof(float)):(0);
+    return (vertexPart.size() > 0)?(vertexPart.begin()->size() * sizeof(float)):(0);
 }
 
 size_t BufferObject::getTextureOffset()
@@ -185,14 +220,40 @@ size_t BufferObject::getTextureOffset()
     {
         return 0;
     }
-    return (((vertexIndexPart.size() > 0) ? (vertexIndexPart.begin()->size()):(0)) +
+    return (((vertexPart.size() > 0) ? (vertexPart.begin()->size()):(0)) +
             ((colorPart.size() > 0)?(colorPart.begin()->size()):(0))) * sizeof(float);
 }
 
+unsigned int* const BufferObject::getFlattenedIndexData()
+{
+    std::vector<std::vector<unsigned int>>::const_iterator iIter = indexPart.begin();
+    size_t addressPtr = 0;
+    
+    if(resetIndexData)
+    {
+        if (flattenedIndexData)
+        {
+            free(flattenedIndexData);
+        }
+        flattenedIndexData = (unsigned int*)malloc(indexSize);
+        if (!flattenedIndexData)
+        {
+            throw MEMORY_ALLOCATION_EXCEPTION;
+        }
+        while(iIter != indexPart.end())
+        {
+            std::copy(iIter->begin(), iIter->end(), &flattenedIndexData[addressPtr]);
+            addressPtr += iIter->size();
+            iIter++;
+        }
+        resetIndexData = false;
+    }
+    return flattenedIndexData;
+}
 
 float* const BufferObject::getFlattenedBufferObjectData()
 {
-    std::vector<std::vector<float>>::const_iterator viIter = vertexIndexPart.begin();
+    std::vector<std::vector<float>>::const_iterator viIter = vertexPart.begin();
     std::vector<std::vector<float>>::const_iterator colorIter = colorPart.begin();
     std::vector<std::vector<float>>::const_iterator textureIter = texturePart.begin();
     std::string errMsg;
@@ -211,9 +272,9 @@ float* const BufferObject::getFlattenedBufferObjectData()
             throw MEMORY_ALLOCATION_EXCEPTION;
         }
         
-        while (viIter != vertexIndexPart.end() || colorIter != colorPart.end() || textureIter != texturePart.end())
+        while (viIter != vertexPart.end() || colorIter != colorPart.end() || textureIter != texturePart.end())
         {
-            if(viIter != vertexIndexPart.end())
+            if(viIter != vertexPart.end())
             {
                 std::copy(viIter->begin(), viIter->end(), &flattenedData[addressPtr]);
                 addressPtr += viIter->size();

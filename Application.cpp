@@ -71,7 +71,7 @@ try
 
     FILE_OPERATOR::printStringToErrorLog("");
 
-    vboData.setVertexIndexPart({{ 0.5f, 0.5f, 0.0f},
+    vboData.setVertexPart({{ 0.5f, 0.5f, 0.0f},
                                 {0.5f, -0.5f, 0.0f},
                                 {-0.5f, -0.5f, 0.0f},
                                 {-0.5f,  0.5f, 0.0f}});
@@ -86,7 +86,7 @@ try
     //                        {0.0f, 0.0f}, 
     //                        {0.0f, 1.0f}});
 
-    eboData.setVertexIndexPart({{0, 1, 3},
+    eboData.setIndexPart({{0, 1, 3},
                                 {1, 2, 3}});
 
     shaderList = sb->getShaderGroup(SHADERBANK_GROUP_ALL);
