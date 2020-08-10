@@ -81,11 +81,11 @@ int Program::link()
     if (!success)
     {
         glGetProgramInfoLog(programid, 512, NULL, infoLog);
-        aFile.open("C:\\Users\\Jacob\\source\\repos\\tetrs3\\aFile.txt", std::ios::out | std::ios::app);
+        aFile.open("C:\\Users\\schec\\myWorkspace\\tetris\\aFile.txt", std::ios::out | std::ios::app);
         snprintf(buffer, sizeof(buffer), "failed to link:\n%s\n", infoLog);
         aFile.write(buffer, strlen(buffer));
         aFile.close();
-        return 0;
+        throw LINK_FAILURE;
     }
     linked = 1;
     return 1;

@@ -9,9 +9,23 @@
 #include <sstream>
 VertexArray::VertexArray()
 {
-    texIdSet = 0;
-    texId = 0;
     glGenVertexArrays(1, &vao);
+}
+
+static std::pair<std::string, unsigned int> findTextureByName
+(const std::vector<std::pair<std::string, unsigned int>>& pairVector, const std::string& target)
+{
+    static std::pair<std::string, unsigned int> notFoundPair("NOTEXTURE", 0);
+    std::vector<std::pair<std::string, unsigned int>>::const_iterator iter;
+    
+    for(iter = pairVector.begin(); iter != pairVector.end(); iter++)
+    {
+        if(iter->first == target)
+        {
+            return *iter;
+        }
+    }
+    return notFoundPair;
 }
 
 int VertexArray::setBuffer(BufferObject& bufferData)
@@ -83,56 +97,79 @@ BufferObject* VertexArray::getBufferObjectFromType(long type)
     }
 }
 
-void VertexArray::setTexture(std::string fileName)
+void VertexArray::setTexture(std::string fileName, VAaccessType type)
 {
     int width, height, numChannels;
     unsigned char* data;
     char fName[256];
-    snprintf(fName, sizeof(fName), "%s", fileName.c_str());
-    data = stbi_load(fName, &width, &height, &numChannels, 0);
-    if (!data)
+    unsigned int texId;
+    std::pair<std::string, unsigned int> pair;
+    static unsigned int offset = 0;
+
+    pair = findTextureByName(textureNames, fileName);
+    if(pair.first == "NOTEXTURE")
     {
-        throw COULD_NOT_LOAD_IMAGE_DATA;
+        stbi_set_flip_vertically_on_load(true);
+        snprintf(fName, sizeof(fName), "%s", fileName.c_str());
+        data = stbi_load(fName, &width, &height, &numChannels, 0);
+    
+        if (!data)
+        {
+            throw COULD_NOT_LOAD_IMAGE_DATA;
+        }
+        glGenTextures(1, &texId);  
+        textureNames.push_back(std::pair<std::string, unsigned int>(fileName, texId));
+        glActiveTexture(GL_TEXTURE0 + offset);
+        glBindTexture(GL_TEXTURE_2D, texId);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+
+        stbi_image_free(data);
     }
-
-    if (texIdSet)
+    else
     {
-        glDeleteTextures(1, &texId);
-    }
-
-    glGenTextures(1, &texId);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texId);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-    glGenerateMipmap(GL_TEXTURE_2D);
-
-    stbi_image_free(data);
-
-    texIdSet = 1;
-
-}
-
-void VertexArray::bindTexture()
-{
-    if (texIdSet)
-    {
-        glActiveTexture(GL_TEXTURE0);
+        texId = pair.second;
+        glActiveTexture(GL_TEXTURE0 + offset);
         glBindTexture(GL_TEXTURE_2D, texId);
     }
+    
+    if(type == VA_OVERWRITE)
+    {
+        offset = 0;
+    }
+    
+    offset = (offset + 1) % 16;
 }
+
+void VertexArray::bindAllTextures()
+{
+    unsigned int offset = 0;
+    std::vector<std::pair<std::string, unsigned int>>::const_iterator iter;
+    for(iter = textureNames.begin(); iter != textureNames.end(); iter++)
+    {
+        glActiveTexture(GL_TEXTURE0 + offset);
+        glBindTexture(GL_TEXTURE_2D, iter->second);
+        
+        offset = (offset + 1) % 16;
+    }
+}
+
 VertexArray::~VertexArray()
 {
+    std::vector<std::pair<std::string, unsigned int>>::const_iterator iter;
+    
     glDeleteVertexArrays(1, &vao);
 
-    if(texIdSet)
+    for(iter = textureNames.begin(); iter != textureNames.end(); iter++)
     {
-        glDeleteTextures(1, &texId);
+        glDeleteTextures(1, &(iter->second));
     }
 }
 

@@ -20,6 +20,8 @@
 
 #define VS_DRAW_VEC3_ARRAY 0
 
+float mixValue;
+
 void logError(int n)
 {
     if (n == BUFFER_OBJECT_INVALID_TYPE)
@@ -50,6 +52,14 @@ void logError(int n)
     {
         FILE_OPERATOR::printStringToErrorLog("failed to initialize shaders\n");
     }
+    else if(n == LINK_FAILURE)
+    {
+       FILE_OPERATOR::printStringToErrorLog("Failed to link program.\n"); 
+    }
+    else if(n == COMPILE_ERROR)
+    {
+        FILE_OPERATOR::printStringToErrorLog("Failed to compile shader.\n"); 
+    }
 }
 
 static void viewPortResize(GLFWwindow* win, int width, int height)
@@ -59,7 +69,6 @@ static void viewPortResize(GLFWwindow* win, int width, int height)
 
 void Application::mainLoop()
 {
-
 try
 {
     VertexArray va;
@@ -69,25 +78,24 @@ try
     BufferObject vboData(GL_ARRAY_BUFFER);
     BufferObject eboData(GL_ELEMENT_ARRAY_BUFFER);
 
+    mixValue = 0.5;
     FILE_OPERATOR::printStringToErrorLog("");
 
     vboData.setVertexPart({{ 0.5f, 0.5f, 0.0f},
                                 {0.5f, -0.5f, 0.0f},
                                 {-0.5f, -0.5f, 0.0f},
                                 {-0.5f,  0.5f, 0.0f}});
-
     vboData.setColorPart({{1.0f, 0.1f, 0.2f},
                           {0.1f, 1.0f, 0.3f}, 
                           {0.1f, 0.2f, 1.0f},
                           {0.7f, 1.0f, 0.1f}});
-
-    //vboData.setTexturePart({{1.0f, 1.0f}, 
-    //                        {1.0f, 0.0f}, 
-    //                        {0.0f, 0.0f}, 
-    //                        {0.0f, 1.0f}});
+    vboData.setTexturePart({{1.0f, 1.0f}, 
+                            {1.0f, 0.0f}, 
+                            {0.0f, 0.0f}, 
+                            {0.0f, 1.0f}});
 
     eboData.setIndexPart({{0, 1, 3},
-                                {1, 2, 3}});
+                         {1, 2, 3}});
 
     shaderList = sb->getShaderGroup(SHADERBANK_GROUP_ALL);
 
@@ -98,10 +106,12 @@ try
 
     va.setBuffer(vboData);
     va.setBuffer(eboData);
-  //  va.setTexture("images\\wall.jpg");
-  //  program.use();
+    va.setTexture("images\\andromeda.png", VA_OVERWRITE);
+    va.setTexture("images\\awesomeface.png", VA_APPEND);
+    program.use();
 
-   // glUniform1i(glGetUniformLocation(program.getId(), "ourTexture"), 0);
+    glUniform1i(glGetUniformLocation(program.getId(), "ourTexture"), 0);
+    glUniform1i(glGetUniformLocation(program.getId(), "snudderTexture"), 1);
 
     while (!glfwWindowShouldClose(window))
     {
@@ -110,16 +120,15 @@ try
         glClearColor(.2f, .3f, .3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-//        va.bindTexture();
+        glUniform1f(glGetUniformLocation(program.getId(), "mixValue"), mixValue);
         program.use();
-
         va.bind();
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
+        
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
-    }
+}
 catch (int n)
 {
     logError(n);
@@ -171,5 +180,17 @@ void Application::processInput(GLFWwindow* win)
     if (glfwGetKey(win, GLFW_KEY_ESCAPE) == GLFW_PRESS)
     {
         glfwSetWindowShouldClose(win, true);
+    }
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+    {
+        mixValue += 0.001f; // change this value accordingly (might be too slow or too fast based on system hardware)
+        if(mixValue >= 1.0f)
+            mixValue = 1.0f;
+    }
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+    {
+        mixValue -= 0.001f; // change this value accordingly (might be too slow or too fast based on system hardware)
+        if (mixValue <= 0.0f)
+            mixValue = 0.0f;
     }
 }

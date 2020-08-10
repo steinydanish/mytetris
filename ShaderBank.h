@@ -5,6 +5,8 @@
 #include <iostream>
 #include <map>
 
+#define COMPILE_ERROR 17
+
 #define BAD_SHADERGROUP_ID 33
 #define SHADER_INIT_FAILED 34
 

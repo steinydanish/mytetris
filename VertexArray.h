@@ -11,6 +11,11 @@
 #define BUFFER_OBJECT_INVALID_TYPE 9
 #define COULD_NOT_LOAD_IMAGE_DATA 11
 
+typedef enum VAaccessType
+{
+    VA_OVERWRITE,
+    VA_APPEND
+}VAaccessType;
 
 class VertexArray
 {
@@ -20,14 +25,13 @@ class VertexArray
         unsigned int vao;
         BufferObject vbo;
         BufferObject ebo;
-        unsigned int texId;
-        int texIdSet;
+        std::vector<std::pair<std::string, unsigned int>> textureNames;
     public: 
         VertexArray();
         ~VertexArray();
         int setBuffer(BufferObject& bufferData);
-        void setTexture(std::string fileName);
-        void bindTexture();
+        void setTexture(std::string fileName, VAaccessType type);
+        void bindAllTextures();
         void bind();
 };
 

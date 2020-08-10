@@ -6,6 +6,7 @@
 #include <map>
 
 #define USED_UNLINKED_PROGRAM 222
+#define LINK_FAILURE 18
 
 class Program
 {

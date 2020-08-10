@@ -4,8 +4,6 @@
 #include <fstream>
 #include <string.h>
 
-#define COMPILE_ERROR 17
-
 static unsigned int createShaderFromPair(std::pair<long, std::string> pair)
 {
     int success;
@@ -33,7 +31,6 @@ static unsigned int createShaderFromPair(std::pair<long, std::string> pair)
         aFile.close();
         throw COMPILE_ERROR;
     }
-
     return shaderId;
 }
 
@@ -54,34 +51,27 @@ std::vector<unsigned int> ShaderBank::getShaderGroup(unsigned int groupId)
     char buffer[512];
     std::ofstream aFile;
 
-    try
-    {
-        if (groupId < FRAGMENT_SHADER_FIRST || (groupId % FRAGMENT_SHADER_FIRST == 0))
-        {
-            throw BAD_SHADERGROUP_ID;
-        }
-        unsigned int tracker = VERTEX_SHADER_FIRST;
-        for (tsIter = vertexShaders.begin(); tsIter != vertexShaders.end() && tracker <= VERTEX_SHADER_LAST; tsIter++)
-        {
-            if (tracker & groupId)
-            {
-                returnVec.push_back(createShaderFromPair(*tsIter));
-            }
-            tracker << 1;
-        }
-        tracker = FRAGMENT_SHADER_FIRST;
-        for (tsIter = fragmentShaders.begin(); tsIter != fragmentShaders.end() && tracker <= FRAGMENT_SHADER_LAST; tsIter++)
-        {
-            if (tracker & groupId)
-            {
-                returnVec.push_back(createShaderFromPair(*tsIter));
-            }
-            tracker << 1;
-        }
-    }
-    catch (int n)
+    if (groupId < FRAGMENT_SHADER_FIRST || (groupId % FRAGMENT_SHADER_FIRST == 0))
     {
         throw BAD_SHADERGROUP_ID;
+    }
+    unsigned int tracker = VERTEX_SHADER_FIRST;
+    for (tsIter = vertexShaders.begin(); tsIter != vertexShaders.end() && tracker <= VERTEX_SHADER_LAST; tsIter++)
+    {
+        if (tracker & groupId)
+        {
+            returnVec.push_back(createShaderFromPair(*tsIter));
+        }
+        tracker << 1;
+    }
+    tracker = FRAGMENT_SHADER_FIRST;
+    for (tsIter = fragmentShaders.begin(); tsIter != fragmentShaders.end() && tracker <= FRAGMENT_SHADER_LAST; tsIter++)
+    {
+        if (tracker & groupId)
+        {
+            returnVec.push_back(createShaderFromPair(*tsIter));
+        }
+        tracker << 1;
     }
     return returnVec;
 }
